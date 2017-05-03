@@ -1,0 +1,3 @@
+administer netauth:
+    title: 'Administer netForum SSO'
+    description: 'Configure how netForum SSO performs.'

@@ -1,0 +1,99 @@
+<?php
+
+/**
+ * @file
+ * Install, Update and Uninstall functions for the netForum SSO module;
+ *
+ */
+
+/**
+ * Implements hook_schema();
+ * Write schema for making table to be created
+ */
+function netauth_schema() {
+	//Check if table exists, if not install the schema.
+	if(db_table_exists('fs_authmap') == FALSE) {
+		$schema['fs_authmap'] = array(
+		    'description' => 'To set external authentication user details getting by netauth module setting.',
+		    'fields' => array(
+				'aid' => array(
+					'type' => 'serial',
+					'length' => 11,
+					'not null' => TRUE,
+				),
+				'uid' => array(
+					'type' => 'int',
+					'length' => 11,
+					'not null' => FALSE,
+				),
+				'authname' => array(
+					'type' => 'varchar',
+					'length' => 128,
+					'not null' => FALSE,
+				),
+				'module' => array(
+					'type' => 'varchar',
+					'length' => 128,
+					'not null' => FALSE,
+				),
+			),
+			'primary key' => array('aid'),
+			'auto increment' => 1,
+		);
+	}	
+	
+	//Check if table exists, if not install the schema.
+	if(db_table_exists('fs_netforum_auth') == FALSE) {
+		$schema['fs_netforum_auth'] = array(
+		    'description' => 'To set the xWeb configuration with sso settings.',
+		    'fields' => array(
+				'id' => array(
+					'type' => 'serial',
+					'length' => 11,
+					'not null' => TRUE,
+				),
+				'uid' => array(
+					'type' => 'int',
+					'length' => 11,
+					'not null' => FALSE,
+				),
+				'cst_key' => array(
+					'type' => 'varchar',
+					'length' => 500,
+					'not null' => FALSE,
+				),
+				'member_type' => array(
+					'type' => 'varchar',
+					'length' => 500,
+					'not null' => FALSE,
+				),
+				'sso_token' => array(
+					'type' => 'varchar',
+					'length' => 1000,
+					'not null' => FALSE,
+				),
+			),
+			'primary key' => array('id'),
+			'auto increment' => 1,
+		);
+	}	
+	return $schema;
+} 
+
+
+/**
+ * Implements hook_install();
+ * Use schema API to create database table.
+ */
+function netauth_install() { 
+	
+}
+
+
+/**
+ * Implements hook_unnstall();
+ * Use schema API to remove table.
+ */
+function netauth_uninstall() {
+	
+}

@@ -1,0 +1,7 @@
+amazing_forms.settings:
+    path: 'admin/amazing-forms/contribute'
+    defaults:
+        _form: '\Drupal\amazing_forms\Form\ContributeForm'
+        _title: 'Conribute page'
+    requirements:
+        _permission: 'administer site configuration'
