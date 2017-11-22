@@ -1,0 +1,15 @@
+name: Salesforce SSO
+type: module
+description: The module allow users to get log-in with Salesforce by it's REST API console.
+package: FS Salesforce
+core: 8.x
+version: '1.0'
+
+configure: salesforce_auth.settings
+hidden: false
+
+#Libraries
+libraries:
+  - salesforce_auth/bootstrap
+  - salesforce_auth/css
+  - salesforce_auth/js
