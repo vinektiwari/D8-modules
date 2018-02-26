@@ -1,0 +1,57 @@
+admin_registration.form:
+ path: '/admin_registration/admin_form'
+ defaults:
+   _title: 'Admin Registration form'
+   _form: '\Drupal\admin_registration\Form\AdminRegistrationForm'
+ requirements:
+   _permission: 'administer users'
+
+site_admin_edit.form:
+ path: '/admin_registration/admin_form/{adminUserId}/edit'
+ defaults:
+   _title: 'Edit Admin'
+   _form: '\Drupal\admin_registration\Form\AdminRegistrationForm'
+ requirements:
+   _permission: 'administer permissions'
+
+site_admin.reset:
+  path: '/site_admin/reset/{uid}/{timestamp}/{hash}'
+  defaults:
+    _controller: '\Drupal\admin_registration\Controller\AdminRegistrationController::resetPass'
+    _title: 'Reset password'
+  requirements:
+    _access: 'TRUE'
+  options:
+    _maintenance_access: TRUE
+    no_cache: TRUE
+
+site_admin.reset.form:
+  path: '/admin_registration/reset/{uid}'
+  defaults:
+    _controller: '\Drupal\admin_registration\Controller\AdminRegistrationController::getResetPassForm'
+    _title: 'Reset password'
+  requirements:
+    _user_is_logged_in: 'FALSE'
+  options:
+    _maintenance_access: TRUE
+    no_cache: TRUE
+
+site_admin.reset.login:
+  path: '/site_admin/reset/{uid}/{timestamp}/{hash}/login'
+  defaults:
+    _controller: '\Drupal\admin_registration\Controller\AdminRegistrationController::resetPassLogin'
+    _title: 'Reset password'
+  requirements:
+    _user_is_logged_in: 'FALSE'
+  options:
+    _maintenance_access: TRUE
+    no_cache: TRUE
+
+entity.user.edit_form:
+   path: '/user/{user}/edit'
+   defaults:
+     _controller: '\Drupal\admin_registration\Controller\AdminRegistrationController::userEdit'
+     _title: 'Edit'
+   requirements:
+      _access_edit_personal_tab: 'TRUE'
+      user: \d+
