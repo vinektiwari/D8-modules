@@ -1,0 +1,6 @@
+advertserve.menu:
+  title: 'Advertserve Ads'
+  parent: system.admin_config_services
+  description: Configure the available AdvertServe Ads ad blocks.
+  route_name: advertserve.config
+  weight: 10

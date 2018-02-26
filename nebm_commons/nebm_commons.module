@@ -1,0 +1,189 @@
+<?php
+
+/**
+ * @file
+ * Contains nebm_commons.module.
+ */
+
+use Drupal\Core\Routing\RouteMatchInterface;
+use Drupal\user\Entity\User;
+
+/**
+ * Implements hook_help().
+ */
+function nebm_commons_help($route_name, RouteMatchInterface $route_match) {
+  switch ($route_name) {
+    // Main module help for the nebm_commons module.
+    case 'help.page.nebm_commons':
+      $output = '';
+      $output .= '<h3>' . t('About') . '</h3>';
+      $output .= '<p>' . t('Common place to have alters') . '</p>';
+      return $output;
+
+    default:
+  }
+}
+
+use Drupal\Core\Form\FormStateInterface;
+
+/**
+ * Implements hook_form_alter() on behalf of nebm_commons.module.
+ */
+function nebm_commons_form_alter(&$form, FormStateInterface $form_state, $form_id) {
+  // Check site specific user.
+  if ($form_id == 'user_login_form') {
+    $form['#submit'][] = 'check_site_specific_user';
+  }
+  // User registration form alters.
+  if ($form_id == 'user_register_form') {
+    // Remove user name from registration page.
+    $form['account']['name']['#access'] = FALSE;
+    $random = new \Drupal\Component\Utility\Random();
+    $form['account']['name']['#default_value'] = $random->name();
+    array_unshift($form['actions']['submit']['#submit'], 'autofill_username_in_register_form');
+    $form['#validate'][] = 'password_character_limit';
+  }
+
+  // Redirect user after profile save.
+  if ($form_id == 'user_form') {
+    $form['actions']['submit']['#submit'][] = 'redirect_user_profile_form_submit';
+    // Remove user name from profile edit page.
+    $form['account']['name']['#access'] = FALSE;
+    array_unshift($form['actions']['submit']['#submit'], 'autofill_username_in_register_form');
+  }
+
+  // Change username lable at login form.
+  if ($form_id == 'user_login_form') {
+    $form['name']['#title'] = t('Email');
+  }
+
+  // Enable 'Anonymous votes' checkbox be default.
+  if ($form_id == 'poll_form') {
+    $form['anonymous_vote_allow']['widget']['value']['#default_value'] = TRUE;
+  }
+
+  /**
+   * Seperate the conditions for node_add and node_edit form for sticking event type,
+   * also added a new conditions for displaying events with three different publishing option.
+   */
+  // Getting content types
+  $contentTypes = \Drupal::service('entity.manager')->getStorage('node_type')->loadMultiple();
+  $contentTypesList = [];
+  foreach ($contentTypes as $contentType) {
+    $contentTypesList[$contentType->id()] = $contentType->label();
+  }
+  
+  // Alters to node event add form.
+  if ($form_id == 'node_events_form') { 
+    $current_user = \Drupal::currentUser();
+    $user = \Drupal\user\Entity\User::load($current_user->id());
+    $eventType = 'External';
+    $eventPublishType = "Awaiting approval";
+
+    // checking user roles
+    if ($user->hasRole('administrator') || $user->hasRole('site_administrator')) {
+      $eventType = 'Internal';
+      $eventPublishType = "Approved";
+      if ($contentTypesList['events'] == "Events") {
+        $form['actions']['publish']['#value'] = "Save";
+        $form['actions']['unpublish']['#access'] = FALSE;  
+      }    
+    } else {
+      $form['field_event_publish_option']['#access'] = FALSE;
+    }
+    
+    // setting up default values
+    $event_publish_term = \Drupal::entityTypeManager()->getStorage('taxonomy_term')->loadByProperties(['name' => $eventPublishType]);
+    if ($event_publish_term) {
+      $eventPub_tid = reset($event_publish_term)->id();
+      $form['field_event_publish_option']['widget']['#default_value'] = [$eventPub_tid];
+    }
+    $event_type_term = \Drupal::entityTypeManager()->getStorage('taxonomy_term')->loadByProperties(['name' => $eventType]);
+    if ($event_type_term) {
+      $event_tid = reset($event_type_term)->id();
+      $form['field_event_type']['widget']['#default_value'] = [$event_tid];
+    }
+      
+    $form['field_event_type']['widget']['#access'] = FALSE;
+    $form['field_registration_link']['widget'][0]['title']['#default_value'] = 'Register';
+    $form['field_registration_link']['widget'][0]['title']['#access'] = FALSE;
+    $form['#attached']['library'][] = 'nebm_commons/nebm.commons';
+  }
+
+  // Alters to node event edit form.
+  if ($form_id == 'node_events_edit_form') { 
+    $current_user = \Drupal::currentUser();
+    $user = \Drupal\user\Entity\User::load($current_user->id());
+    if ($user->hasRole('administrator') || $user->hasRole('site_administrator')) {
+      if ($contentTypesList['events'] == "Events") {
+        $form['actions']['publish']['#value'] = "Save";
+        $form['actions']['unpublish']['#access'] = FALSE;  
+      }    
+    } else {
+      $form['field_event_publish_option']['#access'] = FALSE;
+    }
+    
+    $form['field_event_type']['widget']['#access'] = FALSE;
+    $form['field_registration_link']['widget'][0]['title']['#default_value'] = 'Register';
+    $form['field_registration_link']['widget'][0]['title']['#access'] = FALSE;
+    $form['#attached']['library'][] = 'nebm_commons/nebm.commons';
+  }
+  
+  /**
+   * Alter/changed button terms here for newsletters publishing option.
+   * Alters to node simplenews_issue add/edit form.
+   */
+  if ($form_id == 'node_simplenews_issue_form' || $form_id == 'node_simplenews_issue_edit_form') {
+    $form['field_mail_sent_date']['widget']['#access'] = FALSE;
+    $form['actions']['publish']['#value'] = "Publish";
+    $form['actions']['unpublish']['#value'] = "Draft"; 
+  }
+
+}
+
+/**
+ * Custom callback to check user is domain specific.
+ */
+function check_site_specific_user(&$form, FormStateInterface $form_state, $form_id) {
+  $mail = $form_state->getValue('name');
+  if ($mail) {
+    $user = user_load_by_mail($mail);
+    if ($user) {
+      $domains_listed = [];
+      $accessible_domains = $user->get('field_domain_access')->getValue();
+      $loader = \Drupal::service('domain.negotiator');
+      $current_domain = $loader->getActiveDomain();
+      foreach ($accessible_domains as $value) {
+        $domains_listed[] = $value['target_id'];
+      }
+      if ($domains_listed && !in_array($current_domain->id(), $domains_listed)) {
+        \Drupal::service('session_manager')->destroy();
+      }
+    }
+  }
+}
+
+/**
+ * Password character limit validation callback.
+ */
+function password_character_limit(&$form, FormStateInterface $form_state, $form_id){
+  $password = $form_state->getValue('pass');
+  if (isset($password) && strlen($password) < 8) {
+    $form_state->setErrorByName('password', t('Password must contain 8 characters minimum.'));
+  }
+}
+
+/**
+ * Redirect user to view page after profile save.
+ */
+function redirect_user_profile_form_submit(&$form, FormStateInterface $form_state, $form_id){
+  $form_state->setRedirect('entity.user.canonical', ['user' => \Drupal::currentUser()->id()]);
+}
+
+/**
+ * Custom submit callback for user_register_form.
+ */
+function autofill_username_in_register_form(array &$form, \Drupal\Core\Form\FormStateInterface $form_state) {
+  $mail = $form_state->getValue('mail');
+  $form_state->setValue('name', $mail);
+}

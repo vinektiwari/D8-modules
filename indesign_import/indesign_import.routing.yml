@@ -1,0 +1,7 @@
+indesign_import.form:
+ path: '/indesign_import/indesign_import_form'
+ defaults:
+   _title: 'Import Articles'
+   _form: '\Drupal\indesign_import\Form\InDesignImportForm'
+ requirements:
+   _permission: 'access content'

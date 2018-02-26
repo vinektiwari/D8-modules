@@ -1,0 +1,42 @@
+<?php
+/**
+ * @file
+ * Contains advertserve_ads.module
+ */
+
+/**
+ * @param $existing
+ * @param $type
+ * @param $theme
+ * @param $path
+ * @uses Implements hook_theme()
+ * @return array
+ */
+function advertserve_ads_theme($existing, $type, $theme, $path) {
+  return array(
+    'advertserve_ads' => array(
+      '#theme' => 'advertserve_ads',
+      'variables' => array(
+        'account_id' => \Drupal::state()->get('advertserve_ads_account_id'),
+        'pid' => 0,
+        'zone' => NULL
+      ),
+    ),
+    'advertserve_ads_settings_form_table' => array(
+      'render element' => 'form'
+    )
+  );
+}
+
+/**
+ * @param array $build
+ * @param \Drupal\Core\Block\BlockPluginInterface $block
+ * @uses Implements hook_block_view_alter().
+ */
+function advertserve_ads_block_view_alter(array &$build, \Drupal\Core\Block\BlockPluginInterface $block) {
+  $blockConfig = $block->getConfiguration();
+  if ($blockConfig['provider'] == 'advertserve_ads') {
+    $build['#theme'] = 'advertserve_ads';
+    $build['#zone'] = $build['#derivative_plugin_id'];
+  }
+}

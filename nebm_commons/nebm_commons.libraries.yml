@@ -1,0 +1,4 @@
+nebm.commons:
+  version: VERSION
+  js:
+      js/nebm.js: {}

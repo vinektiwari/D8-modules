@@ -1,0 +1,10 @@
+<table>
+<th>Ad zone ID</th>
+<th>Label for this ad</th>
+{% for key, child in form.rows if key|first != '#' %}
+    <tr>
+        <td style="padding:0">{{ child.id }}</td>
+        <td style="padding:0">{{ child.label }}</td>
+    </tr>
+{% endfor %}
+</table>

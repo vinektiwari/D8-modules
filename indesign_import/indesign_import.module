@@ -1,0 +1,15 @@
+<?php
+
+define('UNPUBLISHED', 0);
+define('PUBLISHED', 1);
+define('XML_TO_HTML_REPLACEMENTS', array(
+  'Image' => 'img',
+  'Story' => 'p',
+  'Head' => 'title',
+  'bold' => 'b',
+  'subhead' => 'h2',
+  'minihead' => 'h3',
+  'PhotoCredit' => 'address',
+  'BulletsUL' => 'li',
+  'Byline' => 'address',
+));

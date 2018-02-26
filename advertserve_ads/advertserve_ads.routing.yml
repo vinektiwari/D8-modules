@@ -1,0 +1,7 @@
+advertserve.config:
+ path: 'admin/config/services/advertserve-ads'
+ defaults:
+   _title: 'Advertserve Ads'
+   _form: '\Drupal\advertserve_ads\Form\AdvertserveAdsForm'
+ requirements:
+   _permission: 'administer permissions'
