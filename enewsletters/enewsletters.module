@@ -1,0 +1,921 @@
+<?php
+
+/**
+ * @file
+ * enewsletters all global variables, constant and general hooks goes here
+ */
+
+use Drupal\Component\Utility\Crypt;
+use Drupal\Component\Utility\SafeMarkup;
+use Drupal\Core\Access\AccessResult;
+use Drupal\Core\Entity\Display\EntityViewDisplayInterface;
+use Drupal\Core\Form\FormStateInterface;
+use Drupal\Core\Link;
+use Drupal\Core\Render\Element;
+use Drupal\Core\Routing\RouteMatchInterface;
+use Drupal\Core\Url;
+use Drupal\field\Entity\FieldConfig;
+use Drupal\field\Entity\FieldStorageConfig;
+use Drupal\node\NodeInterface;
+use Drupal\node\NodeTypeInterface;
+use Drupal\enewsletters\SubscriberInterface;
+use Drupal\user\UserInterface;
+
+/**
+ * NEWSLETTER MAIL PRIORITY
+ */
+define('NEWSLETTER_PRIORITY_NONE', 0);
+define('NEWSLETTER_PRIORITY_LOW', 1);
+define('NEWSLETTER_PRIORITY_NORMAL', 2);
+define('NEWSLETTER_PRIORITY_HIGH', 3);
+
+/**
+ * NEWSLETTER SEND COMMAND
+ */
+define('NEWSLETTER_COMMAND_SEND_TEST', 0);
+define('NEWSLETTER_COMMAND_SEND_NOW', 1);
+define('NEWSLETTER_COMMAND_SEND_PUBLISH', 3);
+
+/**
+ * NEWSLETTER SENT STATUS
+ */
+define('NEWSLETTER_STATUS_SEND_NOT', 0);
+define('NEWSLETTER_STATUS_SEND_PENDING', 1);
+define('NEWSLETTER_STATUS_SEND_READY', 2);
+define('NEWSLETTER_STATUS_SEND_PUBLISH', 3);
+
+/**
+ * NEWSLETTER SUBSCRIPTION STATUS
+ */
+define('NEWSLETTER_SUBSCRIPTION_STATUS_SUBSCRIBED', 1);
+define('NEWSLETTER_SUBSCRIPTION_STATUS_UNSUBSCRIBED', 0);
+define('NEWSLETTER_MAIL_SENT_COUNTER', 10);
+define('NUMBER_OF_SECONDS', 2);
+define('TEST_MAIL_NUMBER', 3);
+
+define('NEWSLETTER_NODE_PUBLISH', 1);
+define('NEWSLETTER_NODE_UNPUBLISH', 0);
+define('ADMIN_UID', 1);
+define('TRIM_TEXT_LIMIT', 250);
+
+/**
+* LOGGED IN USER
+*/
+define('ANONYMOUS', 0);
+define('LOGGED_IN', 1);
+
+/**
+* REGISTERED USER
+*/
+define('REGISTERED_USER', 1);
+
+// Load enewsletters.tokens.inc from enewsletters_token module
+module_load_include('inc', 'enewsletters', 'enewsletters.tokens');
+
+/**
+ * Attached js library to the module
+ */
+function enewsletters_page_attachments(array &$variables) {
+  $variables['#attached']['library'][] = 'enewsletters/enewsletters';
+}
+
+/**
+ * Implements hook_node_type_delete().
+ */
+function enewsletters_node_type_delete(NodeTypeInterface $info) {
+  drupal_static_reset('enewsletters_get_content_types');
+}
+
+/**
+ * Implements hook_node_view().
+ */
+function enewsletters_node_view(array &$build, NodeInterface $node, $display, $view_mode) {
+  if (!enewsletters_check_node_types($node->getType())) {
+    return;
+  }
+
+  // Only do token replacements for view modes other than the our own email view
+  // modes. Token replacements for them will happen later on.
+  if (strpos($view_mode, 'email_') !== FALSE) {
+    return;
+  }
+
+  // Build up content, add as much as there is.
+  $context = array( 'node' => $node, );
+
+  // If the current user is a subscriber, extend context.
+  $user = \Drupal::currentUser();
+  if ($user->id() > 0 && $subscriber = enewsletters_subscriber_load_by_mail($user->getEmail())) {
+    $context['subscriber'] = $subscriber;
+  }
+
+  // Loop over all render array elements.
+  foreach (Element::children($build) as $key) {
+    $element = &$build[$key];
+    // Make sure this is a field.
+    if (!isset($element['#field_type'])) {
+      continue;
+    }
+    // Loop over all field values.
+    foreach (Element::children($element) as $field_key) {
+      $item = &$element[$field_key];
+      // Only fields which result in simple markup elements are supported for
+      // token replacements for now.
+      if (isset($item['#markup'])) {
+        $item['#markup'] = \Drupal::token()->replace($item['#markup'], $context, array());
+      }
+    }
+  }
+}
+
+/**
+ * Implements hook_node_presave().
+ */
+function enewsletters_node_presave(NodeInterface $node) {
+  if (!$node->hasField('newsletters_issue')) {
+    return;
+  }
+}
+
+/**
+ * Check if content type(s) is enabled for use as Newsletters.
+ *
+ * @param $types
+ *   Array of content types or single content type string.
+ * @return boolean
+ *   TRUE if at least one of $types is enabled for Newsletters.
+ *
+ * @ingroup issue
+ */
+function enewsletters_check_node_types($types) {
+  if (!is_array($types)) {
+    $types = array($types);
+  }
+  if ($sn_types = enewsletters_get_content_types()) {
+    foreach ($types as $type) {
+      if (in_array($type, $sn_types)) {
+        return TRUE;
+      }
+    }
+  }
+  return FALSE;
+}
+
+/**
+ * Get all node types supported by enewsletters.
+ *
+ * @return
+ *   Array of node-types which can be used a enewsletters newsletter issue.
+ *
+ * @ingroup issue
+ */
+function enewsletters_get_content_types() {
+  $enewsletters_types = &drupal_static(__FUNCTION__, array());
+
+  if (!$enewsletters_types) {
+    $field_map = \Drupal::entityManager()->getFieldMapByFieldType('newsletter_issue');
+    $enewsletters_types = isset($field_map['node']['newsletter_issue']) ? $field_map['node']['newsletter_issue']['bundles'] : array();
+  }
+  return $enewsletters_types;
+}
+
+/**
+ * Implements hook_form_FORM_ID_alter().
+ * Add checkbox to the content type form to use the content type as newsletter.
+ */
+function enewsletters_form_node_type_form_alter(array &$form, FormStateInterface $form_state) {
+  // Add option to use content type as enewsletters newsletter.
+  $node_type = $form_state->getFormObject()->getEntity();
+
+  // Get the default based on the existence of the newsletters_issue field.
+  $default = FALSE;
+  if (!$node_type->isNew()) {
+    $fields = \Drupal::entityManager()->getFieldDefinitions('node', $node_type->id());
+    $default = isset($fields['newsletters_issue']);
+  }
+
+  $form['workflow']['enewsletters_content_type'] = array(
+    '#type' => 'checkbox',
+    '#title' => t('Use as enewsletters newsletter'),
+    '#default_value' => $default,
+    '#description' => t('This will add the newsletters issue field to this content type, allowing content of this type to be sent out as a newsletter issue.'),
+  );
+
+  $form['actions']['submit']['#submit'][] = 'enewsletters_form_node_type_submit';
+  if (isset($form['actions']['save_continue'])) {
+    $form['actions']['save_continue']['#submit'][] = 'enewsletters_form_node_type_submit';
+  }
+}
+
+/**
+ * Submit callback to add the newsletter_issue field to node types.
+ */
+function enewsletters_form_node_type_submit(array $form, FormStateInterface $form_state) {
+  $checked = $form_state->getValue('enewsletters_content_type');
+
+  $node_type = $form_state->getFormObject()->getEntity();
+  // Get the default based on the existence of the newsletter_issue field.
+  $fields = \Drupal::entityManager()->getFieldDefinitions('node', $node_type->id());
+  $exists = isset($fields['newsletter_issue']);
+
+  if ($checked && !$exists) {
+    // If checked and the field does not exist yet, create it.
+    $field_storage = FieldStorageConfig::loadByName('node', 'newsletter_issue');
+    $field = FieldConfig::create([
+      'field_storage' => $field_storage,
+      'label' => t('Issue'),
+      'bundle' => $node_type->id(),
+      'translatable' => TRUE,
+    ]);
+    $field->save();
+
+    // Set the default widget.
+    entity_get_form_display('node', $node_type->id(), 'default')->setComponent($field->getName())->save();
+  } elseif (!$checked && $exists) {
+    // @todo Consider deleting the field or find a way to disable it. Maybe
+    //   do not allow to disable the checkbox and point to removing the field
+    //   manually? Or remove this feature completely and rely on the field only.
+  }
+}
+
+/**
+ * Implements hook_form_alter().
+ */
+function enewsletters_form_node_form_alter(&$form, FormStateInterface $form_state, $form_id) {
+  // Add enewsletters settings to enewsletters newsletter node form.
+  $node = $form_state->getFormObject()->getEntity();
+  if (in_array($node->getType(), enewsletters_get_content_types())) {
+    // Display warning if the node is currently being sent.
+    if (!$node->isNew()) {
+      if ($node->enewsletters_issue->status == NEWSLETTERS_STATUS_SEND_PENDING) {
+        drupal_set_message(t('This newsletter issue is currently being sent. Any changes will be reflected in the e-mails which have not been sent yet.'), 'warning');
+      }
+    }
+
+    if (\Drupal::moduleHandler()->moduleExists('token')) {
+      $form['enewsletters_token_help'] = array(
+        '#title' => t('Replacement patterns'),
+        '#type' => 'fieldset',
+        '#collapsible' => TRUE,
+        '#collapsed' => TRUE,
+        '#description' => t('These tokens can be used in all text fields except subject and will be replaced on-screen and in the email.'),
+      );
+      $form['enewsletters_token_help']['browser'] = array(
+        '#theme' => 'token_tree_link',
+        '#token_types' => array('enewsletters-newsletter', 'node'),
+      );
+    }
+  }
+  $form['actions']['publish']['#value'] = "Publish";
+  $form['actions']['unpublish']['#value'] = "Draft";
+}
+
+/**
+ * Checks that the site URI is set, and sets an error message otherwise.
+ *
+ * @return bool
+ *   TRUE if the URI is set, otherwise FALSE.
+ */
+function enewsletters_assert_uri() {
+  $host = \Drupal::request()->getHost();
+  // Check if the host name is configured.
+  if ($host == 'default') {
+    \Drupal::logger('enewsletters')->error('Stop sending newsletter to avoid broken links / SPAM. Site URI not specified.');
+    return FALSE;
+  }
+  return TRUE;
+}
+
+/**
+ * Implements hook_cron().
+ */
+function enewsletters_cron() {
+  if (!enewsletters_assert_uri()) {
+    return;
+  }
+
+  $config = \Drupal::config('enewsletters.settings');
+}
+
+/**
+ * Load a enewsletters newsletter subscriber object.
+ *
+ * @param $snid
+ *   Enewsletters subscriber ID.
+ *
+ * @return Subscriber
+ *   Newsletter subscriber entity, FALSE if subscriber does not exist.
+ *
+ * @ingroup subscriber
+ */
+function enewsletters_subscriber_load($snid) {
+  $subscribers = enewsletters_subscriber_load_multiple(array($snid));
+  return $subscribers ? reset($subscribers) : FALSE;
+}
+
+/**
+ * Load a enewsletters newsletter subscriber object.
+ */
+function enewsletters_subscriber_load_by_entityName($nlid) {
+  $query = db_select('enewsletter_subscriber_subscription', 'ess');
+  $query->leftJoin('enewsletter_subscriber', 'es', 'es.id = ess.sub_id');
+  $query->fields('es', array('sub_email'));
+  $query->condition('newsletter_machine_name', $nlid)
+        ->condition('es.status', NEWSLETTER_SUBSCRIPTION_STATUS_SUBSCRIBED)
+        ->condition('ess.status', NEWSLETTER_SUBSCRIPTION_STATUS_SUBSCRIBED);
+  $subscribers = $query->execute()->fetchAll();
+  return $subscribers;
+}
+
+
+/**
+ * Load a enewsletters newsletter subscriber object.
+ *
+ * @param $mail
+ *   Subscriber e-mail address.
+ *
+ * @return \Drupal\enewsletters\SubscriberInterface
+ *   Newsletter subscriber object, FALSE if subscriber does not exist.
+ *
+ * @ingroup subscriber
+ */
+function enewsletters_subscriber_load_by_mail($mail) {
+  $subscribers = db_query('SELECT * FROM {enewsletter_subscriber} WHERE sub_email = :sub_email', [':sub_email' => $mail])->fetchObject();
+  return $subscribers ? reset($subscribers) : FALSE;
+}
+
+/**
+ * Load a enewsletters newsletter subscriber object.
+ *
+ * @param $uid
+ *   Subscriber user id.
+ *
+ * @return Subscriber
+ *   Newsletter subscriber entity, NULL if subscriber does not exist.
+ *
+ * @ingroup subscriber
+ */
+function enewsletters_subscriber_load_by_uid($uid) {
+  if (!$uid) {
+    return NULL;
+  }
+  
+  $subscribers = db_query('SELECT * FROM {enewsletter_subscriber} WHERE uid = :uid', [':uid' => $uid])->fetchObject();
+  return $subscribers ? reset($subscribers) : FALSE;
+}
+
+/**
+ * Loads enewsletters subscriber objects.
+ *
+ * @param $snids
+ *   (Optional) Array of subscriber ID's.
+ *
+ * @return
+ *   Array of subscriber objects that match the given ID's/conditions.
+ *
+ * @ingroup subscriber
+ */
+function enewsletters_subscriber_load_multiple($snids = array()) {
+  $query = db_select('enewsletter_subscriber', 'es')->fields('es', array('id', 'uid', 'sub_fname', 'sub_lname', 'sub_email', 'status', 'created'));
+  $result = $query->condition('status', NEWSLETTER_SUBSCRIPTION_STATUS_SUBSCRIBED)->execute()->fetchAll();
+  return $result;
+}
+
+/**
+ * Loads enewsletters unsubscriber objects.
+ *
+ * @param $snids
+ *   (Optional) Array of subscriber ID's.
+ *
+ * @return
+ *   Array of unsubscriber objects that match the given ID's/conditions.
+ *
+ * @ingroup subscriber
+ */
+function enewsletters_unsubscriber_load_multiple($snids = array()) {
+  $query = db_select('enewsletter_subscriber', 'es')->fields('es', array('id', 'uid', 'sub_fname', 'sub_lname', 'sub_email', 'status'));
+  $result = $query->condition('status', NEWSLETTER_SUBSCRIPTION_STATUS_UNSUBSCRIBED)->execute()->fetchAll();
+  return $result;
+}
+
+/**
+ * Create a list of recent newsletters issues.
+ *
+ * @param integer $newsletter_id
+ *   The newsletter id.
+ * @param integer $count
+ *   The number of newsletters.
+ *
+ * @ingroup issue
+ *
+ * @todo Replace this list by a View.
+ */
+function enewsletters_recent_newsletters($newsletter_id, $count = 5) {
+  $config = \Drupal::config('enewsletters.settings');
+  $query = new EntityFieldQuery;
+  $result = $query
+    ->entityCondition('entity_type', 'node')
+    ->propertyCondition('status', NODE_PUBLISHED)
+    ->fieldCondition($config->get('fields.newsletter'), 'target_id', $newsletter_id)
+    ->fieldCondition($config->get('fields.issue_status'), 'value', NEWSLETTER_STATUS_SEND_NOT, '<>')
+    ->propertyOrderBy('created', 'DESC')
+    ->range(0, $count)
+    ->execute();
+  $titles = array();
+  if (!empty($result['node'])) {
+    foreach (node_load_multiple(array_keys($result['node'])) as $item) {
+      $titles[$item->nid]['data'] = l($item->title, 'node/' . $item->nid);
+    }
+  }
+  return $titles;
+}
+
+/**
+ * Implements hook_mail().
+ *
+ * Send enewsletters mails using drupal mail API.
+ *
+ * @param $key
+ *   Must be one of: node, test, subscribe.
+ * @param $message
+ *   The message array, containing at least the following keys:
+ *   - from
+ *   - headers: An array containing at least a 'From' key.
+ *   - language: The preferred message language.
+ * @param array $params
+ *   The parameter array, containing the following keys:
+ *   - enewsletters_source: An implementation of enewslettersSourceInterface which
+ *     provides the necessary information to build the newsletter mail.
+ */
+function enewsletters_mail($key, &$message, $params) {
+  $options = array(
+    'langcode' => $message['langcode'],
+  );
+
+  switch ($key) {
+    case 'node':
+    case 'test':
+      $message['headers'] = array(
+        'content-type' => 'text/html; charset=UTF-8; format=flowed; delsp=yes',
+        'MIME-Version' => '1.0',
+        'reply-to' => $params['from_add'],
+        'from' => $params['from_name']
+      );
+      $message['from'] = $params['from_name'] .' <'.$params['from_add'].'>';
+      $message['subject'] = $params['subject'];
+      $messageBody = [
+        '#theme' => 'newsletter_mail',
+        '#bodytext' => $params['bodytext'],
+      ];
+      $mail_body = \Drupal::service('renderer')->render($messageBody);
+      $message['body'][] = $mail_body;
+      break;
+    case 'subscribe':
+      $message['headers'] = array(
+        'content-type' => 'text/html; charset=UTF-8; format=flowed; delsp=yes',
+        'MIME-Version' => '1.0',
+        'reply-to' => $params['from_add'],
+        'from' => $params['from_name']
+      );
+      $message['from'] = $params['from_name'] .'<'.$params['from_add'].'>';
+      $message['subject'] = $params['subject'];
+      $messageBody = [
+        '#theme' => 'newsletter_mail',
+        '#bodytext' => $params['bodytext'],
+      ];
+      $mail_body = \Drupal::service('renderer')->render($messageBody);
+      $message['body'][] = $mail_body;
+      break;
+  }
+}
+
+/**
+ * Implements hook_theme().
+ */
+function enewsletters_theme($existing, $type, $theme, $path) {
+  return array(
+    'subscribers' => array(
+      'variables' => array(
+        'subscriberlist' => array()
+      ),
+    ),
+    'unsubscribers' => array(
+      'variables' => array(
+        'unsubscriberlist' => array()
+      ),
+    ),
+    'newsletter_mail' => array(
+      'variables' => array(
+        'bodytext' => array()
+      ),
+    ),
+    'node__newsletter_issue' => array(
+      'template' => 'node--newsletter-issue',
+      'base hook' => 'node',
+      'variables' => array(
+        'bodycontent' => array()
+      ),
+    )
+    // 'newsletter_body' => array(
+    //   'render element' => 'elements',
+    // ),
+  );
+}
+
+/**
+ * Get a enewsletters newsletter entity object.
+ *
+ * @param $newsletter_id
+ *   Enewsletters newsletter ID.
+ *
+ * @return \Drupal\enewsletters\NewsletterInterface
+ *   Newsletter entity object, NULL if newsletter does not exist.
+ *
+ * @ingroup newsletter
+ */
+function enewsletters_newsletter_load($newsletter_id, $reset = FALSE) {
+  $newsletter = enewsletters_newsletter_load_multiple(array($newsletter_id), $reset);
+  return $newsletter ? reset($newsletter) : NULL;
+}
+
+/**
+ * Get list of enewsletters categories with translated names.
+ *
+ * @todo Maybe refactor this method to enewsletters_newsletter_name_list.
+ *
+ * @return
+ *   array of newsletter names. Translated if required.
+ *
+ * @ingroup newsletter.
+ */
+function enewsletters_newsletter_list() {
+  $enewsletters = array();
+  foreach (enewsletters_newsletter_get_all() as $id => $newsletter) {
+    $enewsletters[$id] = SafeMarkup::checkPlain($newsletter->label());
+  }
+  return $enewsletters;
+}
+
+/**
+ * Loads all visible newsletters.
+ *
+ * @param $conditions Aditional contitions.
+ * @return array Filtered newsletter entities.
+ *
+ * @ingroup newsletter
+ */
+function enewsletters_newsletter_get_visible($conditions = array()) {
+  $query = \Drupal::entityQuery('enewsletters_newsletter');
+  $query->sort('weight');
+  foreach ($conditions as $key => $value) {
+    $query->condition($key, $value);
+  }
+  $result = $query->execute();
+  return !empty($result) ? enewsletters_newsletter_load_multiple($result) : NULL;
+}
+
+/**
+ * Loads all enewsletters.
+ *
+ * @return array All newsletter entities.
+ *
+ * @ingroup newsletter
+ */
+function enewsletters_newsletter_get_all() {
+  $enewsletters = enewsletters_newsletter_load_multiple();
+  $entity_type = \Drupal::entityManager()->getDefinition('enewsletters_newsletter');
+  uasort($enewsletters, array($entity_type->getClass(), 'sort'));
+  return $enewsletters;
+}
+
+/**
+ * Load one or many newsletter entites from database.
+ *
+ * @param array $ids List of ids to be loaded or empty array for all.
+ * @param boolean $reset
+ * @return type
+ *
+ * @ingroup newsletter
+ */
+function enewsletters_newsletter_load_multiple($ids = NULL, $reset = FALSE) {
+  return entity_load_multiple('enewsletters_newsletter', $ids, $reset);
+}
+
+/**
+ * Implements hook_help().
+ *
+ */
+function enewsletters_help($route_name, RouteMatchInterface $route_match) {
+  switch ($route_name) {
+    case 'help.page.enewsletters':
+      $help = "<p>" . t('Enewsletters publishes and sends newsletters to lists of subscribers. Both anonymous and authenticated users can opt-in to different mailing lists.') . "</p>\n";
+      $help .= "<p>" . t('Enewsletters uses nodes for <strong>newsletter issues</strong>. Newsletter issues are grouped in a <strong>newsletter</strong>. Enabled Node types are selectable. A newsletter is send to all email addresses which are subscribed to the newsletter. Newsletter issues can be sent only once. Large mailings should be sent by cron to balance the mailserver load.') . "</p>\n";
+      $help .= "<p>" . t('Enewsletters adds elements to the newsletter node add/edit form to manage newsletter format and sending of the newsletter issue. A newsletter issue can be sent for test before sending officially.') . "</p>\n";
+      $help .= "<p>" . t('Both anonymous and authenticated users can <strong>opt-in and opt-out</strong> to a newsletter. A confirmation message is sent to anonymous users when they (un)subscribe. Users can (un)subscribe using a form and a block. A <strong>subscription block</strong> is available for each newsletter offering a subscription form, a link to recent enewsletters and RSS feed. Email addresses can also be imported and exported via the subscription administration pages.') . "</p>\n";
+      $help .= "<h2>" . t('Configuration') . "</h2>\n";
+      $help .= '<ul>';
+      if (\Drupal::currentUser()->hasPermission('administer permissions')) {
+        $link = Link::fromTextAndUrl(t('Configure permissions'), Url::fromRoute('user.admin_permissions'), array('fragment' => 'module-enewsletters'));
+        $help .= '<li>' . $link->toString() . "</li>\n";
+      }
+      if (\Drupal::currentUser()->hasPermission('administer enewsletters settings')) {
+        $link = Link::fromTextAndUrl(t('Configure enewsletters'), Url::fromRoute('enewsletters.settings_newsletter'));
+        $help .= '<li>' . $link->toString() . "</li>\n";
+      }
+      if (\Drupal::currentUser()->hasPermission('administer blocks')) {
+        $help .= '<li>' . t('Enable a newsletter <a href=":admin_blocks">subscription block</a>.', array(':admin_blocks' => Url::fromRoute('block.admin_display')->toString())) . "</li>\n";
+      }
+      if (\Drupal::currentUser()->hasPermission('administer enewsletters settings')) {
+        $help .= '<li>' . t('Manage your <a href=":enewsletters">enewsletters</a>, <a href=":sent">sent enewsletters</a> and <a href=":subscriptions">subscriptions</a>.', array(':enewsletters' => Url::fromRoute('enewsletters.newsletter_list')->toString(), ':sent' => Url::fromUri('base:admin/content/enewsletters')->toString(), ':subscriptions' => Url::fromUri('base:admin/people/enewsletters')->toString())) . "</li>\n";
+      }
+      $help .= '</ul>';
+
+      return $help;
+    case 'node.add':
+      $type = $route_match->getParameter('node_type');
+      $help = '';
+      if ($type->id() == 'enewsletters_issue') {
+        $help = '<p>' . t('Add this newsletter issue to a newsletter by selecting a newsletter from the select list. To send this newsletter issue, first save the node, then use the "Newsletter" tab.') . "</p>\n";
+        if (\Drupal::currentUser()->hasPermission('administer enewsletters settings')) {
+          $help .= '<p>' . t('Set default send options at <a href=":configuration">Administration > Configuration > Web services > Newsletters</a>.', array(':configuration' => Url::fromRoute('enewsletters.newsletter_list')->toString())) . "</p>\n";
+        }
+        if (\Drupal::currentUser()->hasPermission('administer enewsletters')) {
+          $help .= '<p>' . t('Set newsletter specific options at <a href=":configuration">Administration > Content > Newsletters</a>.', array(':configuration' => Url::fromUri('base:admin/content/enewsletters')->toString())) . "</p>\n";
+        }
+      }
+      return $help;
+    case 'enewsletters.settings_newsletter':
+      $help = '<ul>';
+      $help .= '<li>' . t('These settings are default to all enewsletters. Newsletter specific settings can be found at the <a href=":page">newsletter\'s settings page</a>.', array(':page' => Url::fromRoute('enewsletters.newsletter_list')->toString())) . "</li>\n";
+      $help .= '<li>' . t('Install <a href=":swift_mail_url">Swift Mailer</a> to send HTML emails or emails with attachments (both plain text and HTML).', array(':swift_mail_url' => 'https://www.drupal.org/project/swiftmailer')) . "</li>\n";
+      $help .= '</ul>';
+      return $help;
+    case 'enewsletters.newsletter_list':
+      $help = '<p>' . t('Newsletter allow you to send periodic e-mails to subscribers. See <a href=":manage_subscribers">Newsletter subscriptions</a> for a listing of the subscribers', array(':manage_subscribers' => Url::fromUri('base:admin/config/services/enewsletters/subscribers')->toString()));
+      return $help;
+    case 'enewsletters.newsletter_add':
+      $help = '<p>' . t('You can create different enewsletters (or subjects) to categorize your news (e.g. Cats news, Dogs news, ...).') . "</p>\n";
+      return $help;
+    case 'entity.entity_view_display.node.default':
+      $type = $route_match->getParameter('node_type');
+      $help = ($type->id() == 'newsletters_issue') ? '<p>' . t("'Plain' display settings apply to the content of emails send in plain text format. 'HTML' display settings apply to both HTML and plain text alternative content of emails send in HTML format.") . "</p>\n" : '';
+      return $help;
+  }
+}
+
+/**
+ * Returns enewsletters format options.
+ */
+function enewsletters_format_options() {
+  return array(
+    'plain' => t('Plain'),
+    'html' => t('HTML'),
+  );
+}
+
+/**
+ * Returns enewsletters week_days options.
+ */
+function enewsletters_week_days() {
+  return array(
+    'sunday' => t('Sunday'),
+    'monday' => t('Monday'),
+    'tuesday' => t('Tuesday'),
+    'wednusday' => t('Wednusday'),
+    'thursday' => t('Thursday'),
+    'friday' => t('Friday'),
+    'saturday' => t('Saturday'),
+  );
+}
+
+/**
+ * Returns enewsletters stop sending options.
+ */
+function enewsletters_stop_options() {
+  return array(
+    'never' => t('Never'),
+    'on_given_date' => t('On given date'),
+    'num_of_edition' => t('After a maximum number of editions'),
+  );
+}
+
+/**
+ * Returns enewsletters repeat options.
+ */
+function enewsletters_repeat_after() {
+  return array(
+    'none' => t('Choose'),
+    'hour' => t('An Hour'),
+    'week' => t('A Week'),
+    'month' => t('A Month'),
+    'year' => t('A Year'),
+  );
+}
+
+/**
+ * Function to provide the various enewsletters mail priorities for enewsletters.
+ */
+function enewsletters_get_priority() {
+  return array( NEWSLETTERS_PRIORITY_HIGH => t('High'),);
+}
+
+/**
+ * Function to return available enewsletter already present in database .
+ */
+function enewsletters_get_entity_type_id($machine_name) {
+  return db_query('SELECT machine_name FROM {enewsletter} WHERE machine_name = :machine_name', [':machine_name' => $machine_name])->fetchField();
+}
+
+/**
+ * Function to get enewsletter id from custom newsletter structure .
+ */
+function enewsletters_get_newsletter_id($machine_name) {
+  return db_query('SELECT id FROM {enewsletter} WHERE machine_name = :machine_name', [':machine_name' => $machine_name])->fetchField();
+}
+
+/**
+ * Function to check user logged in or not .
+ */
+function check_logged_in_user(){
+  return \Drupal::currentUser()->isAuthenticated();
+}
+
+/**
+ * Function to get subscribers details .
+ */
+function enewsletters_subscriber_details($user_email){
+  return db_query('SELECT id,sub_fname,sub_lname FROM {enewsletter_subscriber} WHERE sub_email = :sub_email', [':sub_email' => $user_email])->fetchObject();
+}
+
+/**
+ * Function to return available enewsletter machine name which subscriber has subscribed .
+ */
+function enewsletters_machine_name_by_subscriber_id($sub_id){
+  return db_query('SELECT newsletter_machine_name FROM {enewsletter_subscriber_subscription} WHERE sub_id = :sub_id', [':sub_id' => $sub_id])->fetchAll();
+}
+
+/**
+ * Function to check if user is already subscribed .
+ */
+function check_subscribed_user($sub_email){
+  return db_select('enewsletter_subscriber')->condition('sub_email' , $sub_email)->countQuery()->execute()->fetchField();
+}
+
+/*
+ * Function to check if mail id is registered or not .
+ */
+function check_registered_user($sub_email){
+  return db_select('users_field_data')->condition('mail' , $sub_email)->countQuery()->execute()->fetchField();
+}
+
+/**
+ * Function to get uid of registered user .
+  */
+function enewsletter_get_uid($sub_email) {
+  return db_query('SELECT uid from {users_field_data} WHERE mail = :sub_email', [':sub_email' => $sub_email])->fetchField();
+}
+
+/**
+ * Implements hook_entity_extra_field_info().
+ */
+function enewsletters_entity_extra_field_info() {
+  $return['user']['user'] = array(
+    'display' => array(
+      'enewsletters' => array(
+        'label' => 'Newsletters',
+        'description' => t('Newsletter subscriptions of the user'),
+        'weight' => 30,
+        'visible' => FALSE,
+      ),
+    ),
+    'form' => array(
+      'enewsletters' => array(
+        'label' => 'Newsletters',
+        'description' => t('Newsletter subscriptions of the user'),
+        'weight' => 5,
+      ),
+    ),
+  );
+  return $return;
+}
+
+/**
+ * Implements hook_node_access().
+ *
+ * Don't allow deletion when a newsletter is pending
+ */
+function enewsletters_node_access(NodeInterface $node, $op, $account) {
+  if ($op == 'delete') {
+    // Check if a newsletter is pending
+    if ($node->hasField('newsletter_issue') && $node->newsletter_issue->status == NEWSLETTER_STATUS_SEND_PENDING) {
+      return AccessResult::forbidden()->cacheUntilEntityChanges($node);
+    }
+  }
+}
+
+/**
+ * Implements hook_field_widget_info_alter().
+ */
+function enewsletters_field_widget_info_alter(&$info) {
+  if (isset($info['options_select'])) {
+    $info['options_select']['field_types'][] = 'newsletter_issue';
+  }
+}
+
+/**
+ * Implements hook_field_formatter_info_alter().
+ */
+function enewsletters_field_formatter_info_alter(&$info) {
+  $info['entity_reference_label']['field_types'][] = 'newsletter_issue';
+}
+
+/**
+ * Count number of subscribers per newsletter list.
+ * @param $nlid
+ *   The newsletter id.
+ * @return
+ *   Number of subscribers.
+ */
+function enewsletters_count_subscriptions($nlid) {
+  $subscription_count = &drupal_static(__FUNCTION__);
+  if (isset($subscription_count)) {
+    return $subscription_count;
+  }
+
+  // @todo: entity query + aggregate
+  $query = db_select('enewsletter_subscriber_subscription', 'ess');
+  $query->leftJoin('enewsletter_subscriber', 'es', 'es.id = ess.sub_id');
+  $query->condition('newsletter_machine_name', $nlid)
+        ->condition('es.status', NEWSLETTER_SUBSCRIPTION_STATUS_SUBSCRIBED)
+        ->condition('ess.status', NEWSLETTER_SUBSCRIPTION_STATUS_SUBSCRIBED);
+  $subscription_count = $query->countQuery()->execute()->fetchField();
+  return $subscription_count;
+}
+
+/**
+ * Get a enewsletters newsletter edition details.
+ *
+ * @param $nid
+ *   Enewsletters edition ID.
+ */
+function enewsletters_edition_id($nid) {
+  return db_query('SELECT node_id FROM {enewsletter_mail_spool} WHERE node_id = :node_id', [':node_id' => $nid])->fetchField();
+}
+
+/**
+ * Get all enewsletters subscriber details.
+ */
+function enewsletters_load_subscribers() {
+  $subscriber = db_query("SELECT es.id,es.sub_fname,es.sub_lname,es.sub_email,es.created, GROUP_CONCAT(e.name) AS news_letters 
+                    FROM enewsletter_subscriber AS es
+                    INNER JOIN enewsletter_subscriber_subscription AS ess on ess.sub_id = es.id
+                    INNER JOIN enewsletter AS e ON e.id = ess.newsletter_id
+                    WHERE es.status = 1 GROUP BY es.id,es.sub_email")->fetchAll();
+  return $subscriber;
+}
+
+/**
+ * Get all enewsletters unsubscriber details.
+ */
+function enewsletters_load_unsubscribers() {
+  $query = db_select('enewsletter_subscriber', 'es');
+  $query->fields('es', array('id','sub_fname','sub_lname','sub_email','created'));
+  $query->condition('es.status', 0);
+  $subscribers = $query->execute()->fetchAll();
+  return $subscribers;
+}
+
+/**
+ * Loads content title by node_id.
+ */
+function enewsletters_get_title($nid) {
+  return db_query('SELECT title FROM {node_field_data} WHERE nid = :nid', [':nid' => $nid])->fetchField();
+}
+
+/**
+ * Loads poll question title by poll_id.
+ */
+function enewsletters_get_poll_title($pid) {
+  return db_query('SELECT question FROM {poll_field_data} WHERE id = :id', [':id' => $pid])->fetchField();
+}
+
+/**
+ * Loads uri alise for articles/events/polls objects.
+ * @param $nodetype
+ *   Content type to be mentioned.
+ * @param $id
+ *   ID for mentioned content type.
+ */
+function enewsletters_get_uri($nodetype,$id) {
+  return \Drupal::service('path.alias_manager')->getAliasByPath('/'.$nodetype.'/'.$id);
+}
+
+/**
+ * Loads domain objects.
+ * @return $domains
+ *   Domains list in key-value pair.
+ */
+function enewsletters_load_domain_options() {
+  $loader = \Drupal::service('domain.loader');
+  return $loader->loadOptionsList();
+}

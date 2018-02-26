@@ -1,0 +1,32 @@
+uuid: 1754e700-7290-485d-a404-4a052ef18ae2
+langcode: en
+status: true
+dependencies:
+    config:
+        - core.entity_view_mode.node.teaser
+        - field.field.node.newsletter_issue.body
+        - field.field.node.newsletter_issue.newsletter_issue
+        - node.type.newsletter_issue
+    module:
+        - text
+        - user
+id: node.newsletter_issue.teaser
+label: null
+targetEntityType: node
+bundle: newsletter_issue
+mode: teaser
+content:
+    body:
+        label: hidden
+        type: text_summary_or_trimmed
+        weight: 0
+        settings:
+            trim_length: 600
+        third_party_settings: {  }
+    links:
+        weight: 100
+hidden: 
+    langcode: true
+    newsletter_issue: false
+    links: true
+third_party_settings: {  }

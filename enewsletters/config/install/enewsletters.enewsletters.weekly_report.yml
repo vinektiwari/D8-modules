@@ -1,0 +1,11 @@
+id: weekly_report
+name: 'Weekly Report'
+description: 'This is a weekly report newsletter.'
+format: plain
+priority: 0
+from_name: ''
+from_address: 'replace@example.org'
+weight: 1
+status: true
+langcode: en
+dependencies: {  }

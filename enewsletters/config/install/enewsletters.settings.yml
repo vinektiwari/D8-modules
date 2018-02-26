@@ -1,0 +1,15 @@
+tabs: true
+
+hash_expiration: 86400
+
+newsletter:
+  format: plain
+  priority: 0
+  receipt: TRUE
+
+mail:
+  use_cron: TRUE
+  throttle: 20
+  spool_progress_expiration: 3600
+  spool_expire: 0
+  debug: FALSE

@@ -1,0 +1,8 @@
+enewsletters:
+  Version: 1.x
+  css:
+     theme:
+      css/dataTables.bootstrap.min.css: {}
+  js:
+    js/jquery.dataTables.min.js: {}
+    js/enewsletters.js: {}

@@ -1,0 +1,15 @@
+id: newsletter_issue
+status: true
+langcode: und
+field_name: newsletter_issue
+entity_type: node
+type: newsletter_issue
+settings:
+  target_type: enewsletters_newsletter
+module: enewsletters
+locked: false
+cardinality: 1
+indexes: {  }
+dependencies:
+  module:
+    - enewsletters

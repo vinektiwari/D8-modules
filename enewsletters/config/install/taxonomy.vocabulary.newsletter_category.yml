@@ -1,0 +1,11 @@
+langcode: en
+status: true
+dependencies:
+  enforced:
+    module:
+      - enewsletters
+name: Newsletter Category
+vid: newsletter_category
+description: 'Stores the enewsletter categories for newsletters and its subscriptions'
+hierarchy: 0
+weight: 0

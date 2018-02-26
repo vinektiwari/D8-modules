@@ -1,0 +1,37 @@
+<h3>Inactive Subscribers</h3>
+<div id="result"></div>
+
+<table id="unsubscriber-table">
+	<thead>
+		<tr>
+			<th>Name</th>
+			<th>Email</th>
+			<th>Created</th>
+			<th>Action</th>
+		</tr>
+	</thead>
+	<tfoot>
+		<tr>
+			<th>Name</th>
+			<th>Email</th>
+			<th>Created</th>
+			<th>Action</th>
+		</tr>
+	</tfoot>
+	<tbody>
+	{% for unsubscribers in unsubscriberlist %}
+		{% set news_letters = unsubscribers.news_letters|split(',') %}
+	    <tr>
+			<td>{{ unsubscribers.sub_fname }} {{ unsubscribers.sub_lname }}</td>
+			<td>{{ unsubscribers.sub_email }}</td>
+			<td>{{ unsubscribers.created }}</td>
+			<td><button type="button" id="btnDelete" data-id="{{ unsubscribers.id }}" class="button button--primary button--small">Delete</button</td>
+		</tr>
+	{% endfor %}
+	{% if unsubscriberlist is empty  %}
+		<tr>
+		    <td colspan="5">Sorry! No inactive subscribers found.</td>
+		</tr>
+	{% endif %}
+	</tbody>
+</table>

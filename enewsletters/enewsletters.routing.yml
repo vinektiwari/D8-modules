@@ -1,0 +1,98 @@
+enewsletters.newsletter_list:
+  path: '/admin/config/services/enewsletters'
+  defaults:
+    _entity_list: 'enewsletters_newsletter'
+    _title: 'Newsletter List'
+  requirements:
+    _permission: 'administer enewsletters'
+
+enewsletters.settings_newsletter:
+  path: 'admin/config/services/enewsletters/settings/newsletter'
+  defaults:
+    _form: '\Drupal\enewsletters\Form\NewsletterSettingsForm'
+    _title: 'Newsletter'
+  requirements:
+    _permission: 'administer enewsletters settings'
+
+enewsletters.settings_prepare_uninstall:
+  path: 'admin/config/services/enewsletters/settings/uninstall'
+  defaults:
+    _form: '\Drupal\enewsletters\Form\PrepareUninstallForm'
+    _title: 'Prepare uninstall'
+  requirements:
+    _permission: 'administer enewsletters settings'
+
+enewsletters.newsletter_add:
+  path: '/admin/config/services/enewsletters/add'
+  defaults:
+    _entity_form: 'enewsletters_newsletter.add'
+    _title: 'Add newsletter'
+  requirements:
+    _entity_create_access: 'enewsletters_newsletter'
+
+entity.enewsletters_newsletter.edit_form:
+  path: '/admin/config/services/enewsletters/edit/{enewsletters_newsletter}'
+  defaults:
+    _entity_form: 'enewsletters_newsletter.edit'
+    _title: 'Edit newsletter'
+  requirements:
+    _entity_access: 'enewsletters_newsletter.update'
+
+entity.enewsletters_newsletter.delete_form:
+  path: '/admin/config/services/enewsletters/delete/{enewsletters_newsletter}'
+  defaults:
+    _entity_form: 'enewsletters_newsletter.delete'
+    _title: 'Delete'
+  requirements:
+    _entity_access: 'enewsletters_newsletter.delete'
+
+enewsletters.subscribe:
+  path: '/admin/config/services/enewsletters/subscribers'
+  defaults:
+    _controller: '\Drupal\enewsletters\Controller\SubscriberController::content'
+    _title: 'Subscriber List'
+  requirements:
+    _permission: 'administer enewsletters'
+
+enewsletters.unsubscrib:
+  path: '/admin/config/services/enewsletters/unsubscribers'
+  defaults:
+    _controller: '\Drupal\enewsletters\Controller\UnSubscriberController::content'
+    _title: 'Unsubscriber List'
+  requirements:
+    _permission: 'administer enewsletters'
+
+enewsletters.node_tab:
+  path: '/node/{node}/newsletter'
+  defaults:
+    _form: '\Drupal\enewsletters\Form\NodeTabForm'
+    _title: 'Newsletter'
+  requirements:
+    _custom_access: 'Drupal\enewsletters\Form\NodeTabForm::checkAccess'
+  options:
+    _admin_route: true
+    no_cache: TRUE
+
+enewsletters.ajax_unsubscribe:
+  path: '/admin/config/services/enewsletters/subscribers/ajax_unsubscribe'
+  defaults:
+    _controller: '\Drupal\enewsletters\Controller\SubscriberController::ajaxUnsubscribe'
+    _title: 'Unsubscribe'
+  requirements:
+    _permission: 'access content'
+
+enewsletters.ajax_subscribe:
+  path: '/admin/config/services/enewsletters/unsubscribers/ajax_subscribe'
+  defaults:
+    _controller: '\Drupal\enewsletters\Controller\UnSubscriberController::ajaxSubscribe'
+    _title: 'Unsubscribe'
+  requirements:
+    _permission: 'access content'
+
+enewsletters.ajax_delete:
+  path: '/admin/config/services/enewsletters/unsubscribers/ajax_delete'
+  defaults:
+    _controller: '\Drupal\enewsletters\Controller\UnSubscriberController::ajaxDelete'
+    _title: 'Unsubscribe'
+  requirements:
+    _permission: 'access content'

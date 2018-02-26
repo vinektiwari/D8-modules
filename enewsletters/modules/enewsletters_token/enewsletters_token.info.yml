@@ -1,0 +1,8 @@
+name: E-NewsLetters Tokens
+description: Custom enewsletters token for newsletter issues/mails.
+type: module
+package: Newsletter & Subscription
+core: '8.x'
+dependencies:
+  - token
+  - enewsletters

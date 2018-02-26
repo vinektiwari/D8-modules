@@ -1,0 +1,46 @@
+<h3>Active Subscribers</h3>
+<div id="result"></div>
+
+<table id="subscriber-table">
+	<thead>
+		<tr>
+			<th>Name</th>
+			<th>Email</th>
+			<th>Subscriptions</th>
+			<th>Created</th>
+			<th>Action</th>
+		</tr>
+	</thead>
+	<tfoot>
+		<tr>
+			<th>Name</th>
+			<th>Email</th>
+			<th>Subscriptions</th>
+			<th>Created</th>
+			<th>Action</th>
+		</tr>
+	</tfoot>
+	<tbody>
+		{% for subscribers in subscriberlist %}
+			{% set news_letters = subscribers.news_letters|split(',') %}
+		    <tr>
+				<td>{{ subscribers.sub_fname }} {{ subscribers.sub_lname }}</td>
+				<td>{{ subscribers.sub_email }}</td>
+				<td>
+					<ul>
+					{% for news_letter in news_letters %}
+						<li>{{ news_letter }}</li>
+					{% endfor %}
+					</ul>	
+				</td>
+				<td>{{ subscribers.created }}</td>
+				<td><button type="button" id="btnUnsubscribe" data-id="{{ subscribers.id }}" class="button button--primary button--small">Unsubscribe</button></td>
+		    </tr>
+		{% endfor %}
+		{% if subscriberlist is empty  %}
+			<tr>
+			    <td colspan="5">Sorry! No active subscribers found.</td>
+			</tr>
+		{% endif %}
+	</tbody>
+</table>

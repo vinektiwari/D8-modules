@@ -1,0 +1,28 @@
+langcode: en
+status: true
+dependencies:
+  config:
+    - field.storage.node.newsletter_issue
+    - node.type.newsletter_issue
+  module:
+    - enewsletters
+id: node.newsletter_issue.newsletter_issue
+field_name: newsletter_issue
+entity_type: node
+bundle: newsletter_issue
+label: 'Newsletter'
+description: ''
+required: true
+translatable: true
+default_value: 
+  -
+    target_id: default
+    handler: newsletter_all
+    handler_settings: {  }
+    status: 0
+    sent_count: 0
+    subscribers: 0
+default_value_callback: ''
+settings:
+  display_summary: true
+field_type: newsletter_issue

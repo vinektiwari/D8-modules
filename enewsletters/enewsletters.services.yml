@@ -1,0 +1,7 @@
+services:
+  plugin.manager.enewsletters_recipient_handler:
+    class: Drupal\enewsletters\RecipientHandler\RecipientHandlerManager
+    parent: default_plugin_manager
+  logger.channel.enewsletters:
+    parent: logger.channel_base
+    arguments: ['enewsletters']

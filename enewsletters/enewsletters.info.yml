@@ -1,0 +1,17 @@
+name: E-NewsLetters
+type: module
+description: Send e-newsletters to subscribers/users and schedule automated cron for newsletter mails.<br> For uninstall go to Configuration > Web services > E-newsletters > Settings and hit "Prepare uninstall".
+package: Newsletter & Subscription
+core: 8.x
+dependencies:
+  - node
+  - field
+  - views
+  - block
+configure: enewsletters.newsletter_list
+hidden: false
+
+#Libraries
+libraries:
+  - enewsletters/css
+  - enewsletters/js

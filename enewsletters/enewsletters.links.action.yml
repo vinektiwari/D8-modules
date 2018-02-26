@@ -1,0 +1,29 @@
+enewsletters.newsletter_add:
+  route_name: enewsletters.newsletter_add
+  title: 'Add newsletter'
+  appears_on:
+    - enewsletters.newsletter_list
+
+enewsletters.subscriber_import:
+  route_name: enewsletters.subscriber_import
+  title: 'Mass subscribe'
+  appears_on:
+    - view.enewsletters_subscribers.page_1
+
+enewsletters.subscriber_unsubscribe:
+  route_name: enewsletters.subscriber_unsubscribe
+  title: 'Mass unsubscribe'
+  appears_on:
+    - view.enewsletters_subscribers.page_1
+
+enewsletters.subscriber_export:
+  route_name: enewsletters.subscriber_export
+  title: 'Export'
+  appears_on:
+    - view.enewsletters_subscribers.page_1
+
+enewsletters.newsletter_issue_add:
+  route_name: node.add
+  appears_on:
+    - view.enewsletters_newsletter.page_1
+  deriver: 'Drupal\enewsletters\Plugin\Derivative\AddNewsletterIssueActionLinks'

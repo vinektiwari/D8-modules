@@ -1,0 +1,202 @@
+<?php
+/**
+ * @file
+ * Install, Update and Uninstall functions for the enewsletters module;
+ *
+ */
+
+/**
+ * Implements hook_schema();
+ * Write schema for making table to be created
+ */
+function enewsletters_schema() {
+	$schema['enewsletter'] = array(
+		'description' => 'To set external authentication user details getting by netauth module setting.',
+		'fields' => array(
+			'id' => array(
+				'type' => 'serial',
+				'length' => 11,
+				'not null' => TRUE,
+			),
+			'name' => array(
+				'description' => 'Name of the newsletter to be created',
+				'type' => 'varchar',
+				'length' => 90,
+				'not null' => FALSE,
+			),
+			'machine_name' => array(
+				'description' => 'Unique identification id for identifing enewsletters',
+				'type' => 'varchar',
+				'length' => 128,
+				'not null' => FALSE,
+			),
+			'status' => array(
+				'description' => 'Status of enewsletter to manage it for publish and saved in draft or remove',
+				'type' => 'int',
+				'size' => 'tiny',
+				'not null' => FALSE,
+			),
+		),
+		'primary key' => array('id'),
+		'auto increment' => 1,
+	);
+
+	$schema['enewsletter_mail_spool'] = array(
+		'description' => 'To set iteration of sending newsletter issues to subscriber.',
+		'fields' => array(
+			'id' => array(
+				'type' => 'serial',
+				'length' => 11,
+				'not null' => TRUE,
+			),
+			'parent_node_id' => array(
+				'description' => 'Parent node id from where the issue will be sent',
+				'type' => 'int',
+				'length' => 11,
+				'not null' => FALSE,
+			),
+			'node_id' => array(
+				'description' => 'Creted node id while sending mails',
+				'type' => 'int',
+				'length' => 11,
+				'not null' => FALSE,
+			),
+			'newsletter_id' => array(
+				'description' => 'Newsletter type id for which the newsletter sending',
+				'type' => 'varchar',
+				'length' => 128,
+				'not null' => FALSE,
+			),
+			'issue_by' => array(
+				'description' => 'THe one who send the newsletter to subscriber',
+				'type' => 'int',
+				'length' => 11,
+				'not null' => FALSE,
+			),
+			'created' => array(
+				'description' => 'The date when the mail sent and node created',
+				'mysql_type' => 'timestamp',
+				'not null' => TRUE
+			),
+			'status' => array(
+				'description' => 'Status of enewsletter to manage it for publish and saved in draft or remove',
+				'type' => 'int',
+				'size' => 'tiny',
+				'not null' => FALSE,
+			),
+		),
+		'primary key' => array('id'),
+		'auto increment' => 1,
+	);
+	
+	// Check if table exists, if not install the schema.
+	// Won't remove the table while un-installing the e-newsletters module.
+	// Subscriber will be safe even if the module doesn't exist.
+	if (db_table_exists('enewsletter_subscriber') == FALSE) {
+		$schema['enewsletter_subscriber'] = array(
+			'description' => 'To have subscribers list in this table',
+			'fields' => array(
+				'id' => array(
+					'type' => 'serial',
+					'length' => 11,
+					'not null' => TRUE,
+				),
+				'uid' => array(
+					'type' => 'int',
+					'length' => 11,
+					'not null' => FALSE,
+				),
+				'sub_fname' => array(
+					'type' => 'varchar',
+					'length' => 128,
+					'not null' => FALSE,
+				),
+				'sub_lname' => array(
+					'type' => 'varchar',
+					'length' => 128,
+					'not null' => FALSE,
+				),
+				'sub_email' => array(
+					'type' => 'varchar',
+					'length' => 128,
+					'not null' => FALSE,
+				),
+				'created' => array(
+					'description' => 'The date when suberiber created',
+					'mysql_type' => 'timestamp',
+					'not null' => TRUE
+				),
+					'status' => array(
+					'type' => 'int',
+					'size' => 'tiny',
+					'not null' => FALSE,
+				),
+			),
+			'primary key' => array('id'),
+			'auto increment' => 1,
+		);
+	}
+
+	$schema['enewsletter_subscriber_subscription'] = array(
+		'description' => 'Subscribers subscription.',
+		'fields' => array(
+			'id' => array(
+				'type' => 'serial',
+				'length' => 11,
+				'not null' => TRUE,
+			),
+			'sub_id' => array(
+				'description' => 'Foreign key for enewsletter_subscriber table.',
+				'type' => 'int',
+				'length' => 11,
+				'not null' => FALSE,
+			),
+			'newsletter_id' => array(
+				'type' => 'int',
+				'length' => 11,
+				'not null' => FALSE,
+			),
+			'newsletter_machine_name' => array(
+				'description' => 'Foreign key for enewsletter table.',
+				'type' => 'varchar',
+				'length' => 128,
+				'not null' => FALSE,
+			),
+			'status' => array(
+				'type' => 'int',
+				'size' => 'tiny',
+				'not null' => FALSE,
+			),
+		),
+		'primary key' => array('id'),
+		'auto increment' => 1,
+
+		'foreign keys' => array(
+			'sub_id' => array(
+				'table' => 'enewsletter_subscriber',
+				'columns' => array('id' => 'sub_id'),
+			),
+			'newsletter_id' => array(
+				'table' => 'enewsletter',
+				'columns' => array('id' => 'newsletter_id','machine_name' => 'newsletter_machine_name'),
+			),
+		),
+	);
+	return $schema;
+} 
+
+/**
+ * Implements hook_install();
+ * Use schema API to create database table.
+ */
+function enewsletters_install() { 
+	drupal_set_message(t('Database schema added for E-Newsletters.'));
+}
+
+/**
+ * Implements hook_unnstall();
+ * Use schema API to remove table.
+ */
+function enewsletters_uninstall() {
+	drupal_set_message(t('Database schema removed for E-Newsletters.'));
+}

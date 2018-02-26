@@ -1,0 +1,64 @@
+langcode: en
+status: true
+dependencies:
+    config:
+        - field.field.node.newsletter_issue.body
+        - field.field.node.newsletter_issue.newsletter_issue
+        - node.type.newsletter_issue
+    module:
+        - text
+        - options
+id: node.newsletter_issue.default
+targetEntityType: node
+bundle: newsletter_issue
+mode: default
+content:
+    body:
+        label: hidden
+        type: text_textarea_with_summary
+        weight: 2
+        settings:
+            rows: 9
+            summary_rows: 3
+            placeholder: ''
+        third_party_settings: {  }
+    links:
+        weight: 100
+    created:
+        type: datetime_timestamp
+        weight: 10
+        settings: {  }
+        third_party_settings: {  }
+    promote:
+        type: boolean_checkbox
+        settings:
+            display_label: true
+        weight: 15
+        third_party_settings: {  }
+    newsletter_issue:
+        type: options_select
+        weight: 3
+        settings: {  }
+        third_party_settings: {  }
+    sticky:
+        type: boolean_checkbox
+        settings:
+            display_label: true
+        weight: 16
+        third_party_settings: {  }
+    title:
+        type: string_textfield
+        weight: 0
+        settings:
+            size: 60
+            placeholder: ''
+        third_party_settings: {  }
+    uid:
+        type: entity_reference_autocomplete
+        weight: 5
+        settings:
+            match_operator: CONTAINS
+            size: 60
+            placeholder: ''
+        third_party_settings: {  }
+hidden: {  }

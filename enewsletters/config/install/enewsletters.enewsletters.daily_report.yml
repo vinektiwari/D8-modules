@@ -1,0 +1,11 @@
+id: daily_report
+name: 'Daily Report'
+description: 'This is a daily report newsletter.'
+format: plain
+priority: 0
+from_name: ''
+from_address: 'replace@example.org'
+weight: 0
+status: true
+langcode: en
+dependencies: {  }

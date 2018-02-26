@@ -1,0 +1,45 @@
+enewsletters.newsletter_list:
+  title: Newsletters
+  description: 'Listing of all enewsletters.'
+  base_route: enewsletters.newsletter_list
+  route_name: enewsletters.newsletter_list
+
+enewsletters.subscribe:
+  title: Subscribers
+  description: 'Newsletters subscriber list.'
+  base_route: enewsletters.newsletter_list
+  route_name: enewsletters.subscribe
+
+enewsletters.unsubscrib:
+  title: Unsubscribers
+  description: 'Newsletters unsubscriber list.'
+  base_route: enewsletters.newsletter_list
+  route_name: enewsletters.unsubscrib
+
+enewsletters.settings:
+  title: Settings
+  description: 'Newsletters settings.'
+  base_route: enewsletters.newsletter_list
+  route_name: enewsletters.settings_newsletter
+
+enewsletters.settings_newsletter:
+  title: Newsletter
+  description: 'Sub tab for settings - Enewsletters newsletter settings.'
+  base_route: enewsletters.newsletter_list
+  route_name: enewsletters.settings_newsletter
+  parent_id: enewsletters.settings
+  weight: -5
+
+enewsletters.settings_prepare_uninstall:
+  title: 'Prepare uninstall'
+  description: 'Sub tab for settings - Remove fields and data created by Enewsletters module.'
+  base_route: enewsletters.newsletter_list
+  route_name: enewsletters.settings_prepare_uninstall
+  parent_id: enewsletters.settings
+  weight: -4
+
+enewsletters.node_tab:
+  title: Newsletter
+  route_name: enewsletters.node_tab
+  base_route: entity.node.canonical
+  weight: 5

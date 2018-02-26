@@ -1,0 +1,5 @@
+enewsletters.settings:
+  title: E-newsLetters
+  description: 'Configure your sites enewsletters'
+  parent: system.admin_config_services
+  route_name: enewsletters.newsletter_list

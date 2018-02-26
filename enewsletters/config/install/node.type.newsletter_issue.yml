@@ -1,0 +1,13 @@
+langcode: en
+status: true
+dependencies:
+  enforced:
+    module:
+      - enewsletters
+name: 'Newsletter Issue'
+type: newsletter_issue
+description: 'Use <em>Newsletter Issue</em> to add e-newsletter editions for subscription.'
+help: ''
+new_revision: false
+preview_mode: 1
+display_submitted: true
