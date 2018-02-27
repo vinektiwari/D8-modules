@@ -1,0 +1,9 @@
+name: Cambey & West Auth
+type: module
+description: This module allow users to get login/signup process with 'Cambey & West' API.
+package: Cambey & West
+core: 8.x
+version: '1.0'
+
+configure: cwauth.settings
+hidden: false

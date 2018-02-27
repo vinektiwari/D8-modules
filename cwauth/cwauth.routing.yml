@@ -1,0 +1,22 @@
+cwauth.settings:
+  path: 'admin/config/cwauth/settings'
+  defaults:
+    _form: '\Drupal\cwauth\Form\CwauthSettingsForm'
+    _title: 'C&W Authentication'
+  requirements:
+    _permission: 'administer site configuration'
+  options:
+    _admin_route: TRUE
+
+cwauth.subscribe_users:
+  path: 'admin/config/cwauth/subscribe-users'
+  defaults:
+    _form: '\Drupal\cwauth\Form\SubscribeUserForm'
+    _title: 'Subscribe Users To Cambey & West'
+  requirements:
+    _permission: 'administer site configuration'
+  options:
+    _admin_route: TRUE
+
+
+        

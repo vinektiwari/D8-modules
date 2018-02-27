@@ -1,0 +1,11 @@
+cwauth.settings:
+  title: 'C&W Authentication'
+  parent: system.admin_config_services
+  description: 'Cambey & West auth configuration settings.'
+  route_name: cwauth.settings
+
+cwauth.subscribe_users:
+  title: 'C&W Subscribe Users'
+  parent: system.admin_config_services
+  description: 'Subscribing all NEBM users on Cambey & West portal with its provided API.'
+  route_name: cwauth.subscribe_users
